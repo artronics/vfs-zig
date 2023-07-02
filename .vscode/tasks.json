@@ -28,6 +28,14 @@
             "group": {
                 "kind": "test",
             }
+        },{
+            "label": "run string_builder tests",
+            "type": "shell",
+            "command": "zig test ${workspaceFolder}/src/string_builder.zig",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+            }
         }
     ]
 }
