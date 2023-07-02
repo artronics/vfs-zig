@@ -9,32 +9,30 @@ pub const FsNode = struct {
 
     allocator: Allocator,
     name: []const u8,
-    children: ?ArrayList(FsNode),
+    children: ArrayList(FsNode),
     parent: ?*FsNode,
 
     fn init(allocator: Allocator, name: []const u8) !Self {
         var n = try allocator.alloc(u8, name.len);
         std.mem.copy(u8, n, name);
 
+        const children = ArrayList(FsNode).init(allocator);
+
         return Self{
             .allocator = allocator,
             .name = n,
-            .children = null,
+            .children = children,
             .parent = null,
         };
     }
 
     fn deinit(self: Self) void {
         self.allocator.free(self.name);
+        self.children.deinit();
     }
 
-    fn addChild(self: Self, node: FsNode) !void {
-        if (self.children == null) {
-            self.children = ArrayList(FsNode).init(self.allocator);
-        }
-        if (self.children) |ch| {
-            try ch.append(node);
-        }
+    fn addChild(self: *Self, node: FsNode) !void {
+        try self.children.append(node);
     }
 };
 
@@ -78,12 +76,12 @@ test "Fs" {
     defer vfs.deinit();
     log.warn("path: {s}", .{vfs.root.name});
 
-    const r = try FsNode.init(a, "root");
+    var r = try FsNode.init(a, "root");
     defer r.deinit();
 
     const c1 = try FsNode.init(a, "c1");
     defer c1.deinit();
-    r.addChild(c1);
+    try r.addChild(c1);
 
     try expect(r.name[1] == 'o');
 }
