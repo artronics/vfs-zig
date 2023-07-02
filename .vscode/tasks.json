@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "zig build",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
+            "label": "run main tests",
+            "type": "shell",
+            "command": "zig test ${workspaceFolder}/src/main.zig",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },{
+            "label": "run vfs tests",
+            "type": "shell",
+            "command": "zig test ${workspaceFolder}/src/vfs.zig",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+            }
+        }
+    ]
+}
