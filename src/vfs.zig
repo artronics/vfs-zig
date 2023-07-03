@@ -10,15 +10,16 @@ pub const FsNode = struct {
 
     allocator: Allocator,
     name: []const u8,
-    children: ArrayList(FsNode),
+    children: ArrayList(*FsNode),
     parent: ?*FsNode,
     kind: fs.File.Kind,
 
     fn init(allocator: Allocator, name: []const u8, kind: fs.File.Kind) !Self {
-        var n = try allocator.alloc(u8, name.len);
-        @memcpy(n, name);
+        // var n = try allocator.alloc(u8, name.len);
+        // @memcpy(n, name);
+        const n = try std.fmt.allocPrint(allocator, "{s}", .{name});
 
-        const children = ArrayList(FsNode).init(allocator);
+        const children = ArrayList(*FsNode).init(allocator);
 
         return Self{
             .allocator = allocator,
@@ -32,15 +33,15 @@ pub const FsNode = struct {
     fn deinit(self: Self) void {
         self.allocator.free(self.name);
         for (self.children.items) |child| {
-            log.warn("deinit {s}", .{child.name});
             child.deinit();
+            self.allocator.destroy(child);
         }
         self.children.deinit();
     }
 
     fn addChild(self: *Self, node: *FsNode) !void {
-        node.*.parent = self;
-        try self.children.append(node.*);
+        node.parent = self;
+        try self.children.append(node);
     }
 
     fn print(self: Self, sb: *StringBuilder) !void {
@@ -70,7 +71,7 @@ pub const Filesystem = struct {
     const Self = @This();
 
     allocator: Allocator,
-    root: FsNode,
+    root: *FsNode,
 
     pub fn init(allocator: Allocator, path: []const u8) !Self {
         var d = try fs.openDirAbsolute(path, .{ .access_sub_paths = true, .no_follow = true });
@@ -79,15 +80,9 @@ pub const Filesystem = struct {
         var walker = try id.walk(allocator);
         defer walker.deinit();
 
-        // var stack = ArrayList(FsNode).init(allocator);
-        // defer stack.deinit();
-        var root = try FsNode.init(allocator, path, fs.File.Kind.Directory);
-        // try walkDirs(allocator, &stack, &w, &root);
-        try walkDirs3(allocator, &walker, &root);
-
-        // while (try walker.next()) |dd| {
-        // log.warn("path: {s}, kind: {}", .{ dd.path, dd.kind });
-        // }
+        var root = try allocator.create(FsNode);
+        root.* = try FsNode.init(allocator, path, fs.File.Kind.Directory);
+        try walkDirs(allocator, &walker, root);
 
         return Self{
             .allocator = allocator,
@@ -97,74 +92,45 @@ pub const Filesystem = struct {
 
     pub fn deinit(self: Self) void {
         self.root.deinit();
+        self.allocator.destroy(self.root);
     }
-    fn walkDirs2(allocator: Allocator, walker: *fs.IterableDir.Walker, root: *FsNode) !void {
-        var stack = ArrayList(*FsNode).init(allocator);
-        defer stack.deinit();
-        try stack.append(root);
-        var top = stack.getLast();
-        var visit_parent = true;
-
-        while (try walker.next()) |next| {
-            if (next.kind == fs.File.Kind.Directory) {
-                var dir_node = try FsNode.init(allocator, next.basename, next.kind);
-                try top.addChild(&dir_node);
-                try stack.append(&dir_node);
-                top = &dir_node;
-                visit_parent = true;
-            } else if (next.kind == fs.File.Kind.File) {
-                if (visit_parent) {
-                    _ = stack.pop();
-                    visit_parent = false;
-                }
-                var file_node = try FsNode.init(allocator, next.basename, next.kind);
-                try top.addChild(&file_node);
-            } else {
-                log.warn("file type \"{}\" not supported", .{next.kind});
-            }
-        }
-    }
-    fn walkDirs3(allocator: Allocator, walker: *fs.IterableDir.Walker, root: *FsNode) !void {
+    fn walkDirs(allocator: Allocator, walker: *fs.IterableDir.Walker, root: *FsNode) !void {
         var stack = ArrayList(*FsNode).init(allocator);
         defer stack.deinit();
         // const root_name = fs.path.basename(root.name);
         try stack.append(root);
 
+        var prev = root;
         while (try walker.next()) |next| {
-            const parent_name = fs.path.dirname(next.path) orelse fs.path.basename(root.name);
+            const parent_name = fs.path.basename(fs.path.dirname(next.path) orelse root.name);
             const basename = next.basename;
-            var node = try FsNode.init(allocator, basename, next.kind);
-            // log.warn("path: {s} | parent: {?s}", .{ next.path, parent_name });
-            // log.warn("base: {s} | path: {s} | node: {s}", .{ stack.getLast(), next.path, parent_name });
+            var node = try allocator.create(FsNode);
+            node.* = try FsNode.init(allocator, basename, next.kind);
             const top = stack.getLast();
-            if (std.mem.eql(u8, top.name, parent_name)) {
-                log.warn("path: {s} | parent: {?s}", .{ next.path, parent_name });
-                try top.addChild(&node);
-            } else {}
-        }
-    }
 
-    fn walkDirs(allocator: Allocator, stack: *ArrayList(FsNode), walker: *fs.IterableDir.Walker, node: *FsNode) !void {
-        // _ = stack;
-        if (try walker.next()) |next| {
-            var next_node = try FsNode.init(allocator, next.basename, next.kind);
-            if (node.kind == fs.File.Kind.Directory) {
-                try node.addChild(&next_node);
-                // try stack.append(node);
-                try walkDirs(allocator, stack, walker, &next_node);
+            if (std.mem.eql(u8, fs.path.basename(top.name), parent_name)) {
+                try top.addChild(node);
             } else {
-                try node.addChild(&next_node);
-                // var top = stack.pop();
-                while (try walker.next()) |leaf| {
-                    var leaf_node = try FsNode.init(allocator, leaf.basename, leaf.kind);
-                    if (leaf_node.kind == fs.File.Kind.Directory) {
-                        try walkDirs(allocator, stack, walker, &leaf_node);
+                var parent_index: usize = 0;
+                for (stack.items, 0..) |item, i| {
+                    if (std.mem.eql(u8, item.name, parent_name)) {
+                        parent_index = i;
                         break;
-                    } else {
-                        try node.addChild(&leaf_node);
                     }
                 }
+
+                if (parent_index == 0) {
+                    try stack.append(prev);
+                    try prev.addChild(node);
+                } else {
+                    for (0..stack.items.len - parent_index - 1) |_| {
+                        _ = stack.pop();
+                    }
+                    try stack.getLast().addChild(node);
+                }
             }
+
+            prev = node;
         }
     }
 };
@@ -175,23 +141,13 @@ const a = std.testing.allocator;
 test "Fs" {
     var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     var d = try std.os.getcwd(&buf);
-    d = try std.fmt.allocPrint(a, "{s}/test_data/b/d", .{d});
+    d = try std.fmt.allocPrint(a, "{s}/test_data", .{d});
     defer a.free(d);
 
     var vfs = try Filesystem.init(a, d);
     defer vfs.deinit();
     log.warn("path: {s}", .{vfs.root.name});
 
-    // var r = try FsNode.init(a, "root", fs.File.Kind.Directory);
-    // defer r.deinit();
-    // var r = vfs.root;
-
-    // var c1 = try FsNode.init(a, "c1", fs.File.Kind.File);
-    // var c2 = try FsNode.init(a, "c2", fs.File.Kind.Directory);
-    // var d1 = try FsNode.init(a, "d1", fs.File.Kind.File);
-    // try c2.addChild(&d1);
-    // try vfs.root.addChild(&c1);
-    // try vfs.root.addChild(&c2);
 
     var sb = try StringBuilder.init(4096, a);
     defer sb.deinit();
@@ -199,6 +155,4 @@ test "Fs" {
     try vfs.root.print(&sb);
 
     log.warn("{s}", .{sb.string()});
-
-    // try expect(r.name[1] == 'i');
 }
