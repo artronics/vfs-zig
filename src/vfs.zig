@@ -5,73 +5,69 @@ const StringBuilder = @import("string_builder.zig").StringBuilder;
 const fs = std.fs;
 const log = std.log;
 
-pub const FsNode = struct {
-    const Self = @This();
-
-    allocator: Allocator,
-    name: []const u8,
-    children: ArrayList(*FsNode),
-    parent: ?*FsNode,
-    kind: fs.File.Kind,
-
-    fn init(allocator: Allocator, name: []const u8, kind: fs.File.Kind) !Self {
-        // var n = try allocator.alloc(u8, name.len);
-        // @memcpy(n, name);
-        const n = try std.fmt.allocPrint(allocator, "{s}", .{name});
-
-        const children = ArrayList(*FsNode).init(allocator);
-
-        return Self{
-            .allocator = allocator,
-            .name = n,
-            .children = children,
-            .parent = null,
-            .kind = kind,
-        };
-    }
-
-    fn deinit(self: Self) void {
-        self.allocator.free(self.name);
-        for (self.children.items) |child| {
-            child.deinit();
-            self.allocator.destroy(child);
-        }
-        self.children.deinit();
-    }
-
-    fn addChild(self: *Self, node: *FsNode) !void {
-        node.parent = self;
-        try self.children.append(node);
-    }
-
-    fn print(self: Self, sb: *StringBuilder) !void {
-        var parent = self.parent;
-        var indent: u8 = 0;
-        while (parent != null) : (parent = parent.?.parent) {
-            indent += 1;
-        }
-
-        for (0..indent) |_| {
-            try sb.append("  ", .{});
-        }
-        if (self.kind == fs.File.Kind.Directory) {
-            try sb.append("+ {s}", .{self.name});
-        } else {
-            try sb.append("| {s}", .{self.name});
-        }
-        try sb.append("\n", .{});
-
-        for (self.children.items) |child| {
-            try child.print(sb);
-        }
-    }
-};
-
 pub const Filesystem = struct {
     const Self = @This();
 
     allocator: Allocator,
     root: *FsNode,
+
+    const FsNode = struct {
+        allocator: Allocator,
+        name: []const u8,
+        children: ArrayList(*FsNode),
+        parent: ?*FsNode,
+        kind: fs.File.Kind,
+
+        fn init(allocator: Allocator, name: []const u8, kind: fs.File.Kind) !FsNode {
+            const _name = try std.fmt.allocPrint(allocator, "{s}", .{name});
+
+            const children = ArrayList(*FsNode).init(allocator);
+
+            return FsNode{
+                .allocator = allocator,
+                .name = _name,
+                .children = children,
+                .parent = null,
+                .kind = kind,
+            };
+        }
+
+        fn deinit(self: FsNode) void {
+            self.allocator.free(self.name);
+            for (self.children.items) |child| {
+                child.deinit();
+                self.allocator.destroy(child);
+            }
+            self.children.deinit();
+        }
+
+        fn addChild(self: *FsNode, node: *FsNode) !void {
+            node.parent = self;
+            try self.children.append(node);
+        }
+
+        fn print(self: FsNode, sb: *StringBuilder) !void {
+            var parent = self.parent;
+            var indent: u8 = 0;
+            while (parent != null) : (parent = parent.?.parent) {
+                indent += 1;
+            }
+
+            for (0..indent) |_| {
+                try sb.append("  ", .{});
+            }
+            if (self.kind == fs.File.Kind.Directory) {
+                try sb.append("+ {s}", .{self.name});
+            } else {
+                try sb.append("| {s}", .{self.name});
+            }
+            try sb.append("\n", .{});
+
+            for (self.children.items) |child| {
+                try child.print(sb);
+            }
+        }
+    };
 
     pub fn init(allocator: Allocator, path: []const u8) !Self {
         var d = try fs.openDirAbsolute(path, .{ .access_sub_paths = true, .no_follow = true });
@@ -97,7 +93,6 @@ pub const Filesystem = struct {
     fn walkDirs(allocator: Allocator, walker: *fs.IterableDir.Walker, root: *FsNode) !void {
         var stack = ArrayList(*FsNode).init(allocator);
         defer stack.deinit();
-        // const root_name = fs.path.basename(root.name);
         try stack.append(root);
 
         var prev = root;
@@ -136,9 +131,9 @@ pub const Filesystem = struct {
 };
 
 const expect = std.testing.expect;
-const a = std.testing.allocator;
 
 test "Fs" {
+    const a = std.testing.allocator;
     var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     var d = try std.os.getcwd(&buf);
     d = try std.fmt.allocPrint(a, "{s}/test_data", .{d});
@@ -147,7 +142,6 @@ test "Fs" {
     var vfs = try Filesystem.init(a, d);
     defer vfs.deinit();
     log.warn("path: {s}", .{vfs.root.name});
-
 
     var sb = try StringBuilder.init(4096, a);
     defer sb.deinit();
