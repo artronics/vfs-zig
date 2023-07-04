@@ -23,7 +23,7 @@
         },{
             "label": "run vfs tests",
             "type": "shell",
-            "command": "zig test ${workspaceFolder}/src/vfs.zig",
+            "command": "zig test -femit-bin=${workspaceFolder}/zig-out/lib/vfs-test ${workspaceFolder}/src/vfs.zig",
             "problemMatcher": [],
             "group": {
                 "kind": "test",

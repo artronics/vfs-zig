@@ -2,11 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(lldb) Launch",
+            "name": "vfs-test",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/zig-out/bin/lox-zig",
-            "args": ["${workspaceFolder}/data/program.lox"],
+            "program": "${workspaceFolder}/zig-out/lib/vfs-test",
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],

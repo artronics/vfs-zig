@@ -130,14 +130,18 @@ pub const Filesystem = struct {
     }
 };
 
-const expect = std.testing.expect;
+const testing = std.testing;
+const expect = testing.expect;
 
 test "Fs" {
-    const a = std.testing.allocator;
+    const a = testing.allocator;
+
+    var tmp_dir = testing.tmpDir(.{});
+    defer tmp_dir.cleanup();
+    try makeTestData(tmp_dir);
+
     var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
-    var d = try std.os.getcwd(&buf);
-    d = try std.fmt.allocPrint(a, "{s}/test_data", .{d});
-    defer a.free(d);
+    var d = try tmp_dir.dir.realpath("root", &buf);
 
     var vfs = try Filesystem.init(a, d);
     defer vfs.deinit();
@@ -149,4 +153,23 @@ test "Fs" {
     try vfs.root.print(&sb);
 
     log.warn("{s}", .{sb.string()});
+}
+
+/// create a simple nested directory structure for testing
+/// + root
+///   + a2
+///     + a2b0
+///       | a2b0c0.txt
+///   | a0.txt
+///   + a1
+///     | a1b1.txt
+///     | a1b0.txt
+///
+fn makeTestData(dir: testing.TmpDir) !void {
+    try dir.dir.makePath("root/a1");
+    try dir.dir.makePath("root/a2/a2b0");
+    _ = try dir.dir.createFile("root/a0.txt", .{});
+    _ = try dir.dir.createFile("root/a1/a1b0.txt", .{});
+    _ = try dir.dir.createFile("root/a1/a1b1.txt", .{});
+    _ = try dir.dir.createFile("root/a2/a2b0/a2b0c0.txt", .{});
 }
