@@ -57,9 +57,9 @@ pub const Filesystem = struct {
                 try sb.append("  ", .{});
             }
             if (self.kind == fs.File.Kind.Directory) {
-                try sb.append("+ {s}", .{fs.path.basename(self.path)});
+                try sb.append("/{s}", .{fs.path.basename(self.path)});
             } else {
-                try sb.append("| {s}", .{fs.path.basename(self.path)});
+                try sb.append("{s}", .{fs.path.basename(self.path)});
             }
             try sb.append("\n", .{});
 
@@ -108,19 +108,28 @@ pub const Filesystem = struct {
             const node_parent = fs.path.dirname(node.path) orelse root.path;
 
             var top = stack.pop();
-            while(!std.mem.eql(u8, top.path, node_parent)) {
+            while (!std.mem.eql(u8, top.path, node_parent)) {
                 top = stack.pop();
             }
             try stack.append(top);
             try stack.append(node);
             try top.addChild(node);
 
+            // TODO: Below is an unrolled version of above when same level child are added. Does it perform better?
+            //       In most real world scenarios the number of files at the same level will be bigger than the number of directories
+            //
+            // var top = stack.getLast();
             // if (std.mem.eql(u8, top.path, node_parent)) {
             //     try top.addChild(node);
             //     try stack.append(node);
             // } else {
             //     top = stack.pop();
-            //     while (std.mem.eql(u8, top.path, node_parent)) : (top = stack.pop()) {}
+            //     while (!std.mem.eql(u8, top.path, node_parent)) {
+            //         top = stack.pop();
+            //     }
+            //     try stack.append(top);
+            //     try stack.append(node);
+            //     try top.addChild(node);
             // }
         }
     }
@@ -154,18 +163,18 @@ test "Fs" {
 }
 
 /// create a simple nested directory structure for testing
-/// + root
-///  + empty
-///  + a2
-///    + a2b0
-///      | a2b0c0.txt
-///  | a0.txt
-///  + a1
-///    | a1b1.txt
-///    | a1b0.txt
-///  + same
-///    + same
-///      + same
+/// /root
+///   /empty
+///   /a2
+///     /a2b0
+///       a2b0c0.txt
+///   a0.txt
+///   /a1
+///     a1b1.txt
+///     a1b0.txt
+///   /same
+///     /same
+///       /same
 ///
 fn makeTestData(dir: testing.TmpDir) !void {
     try dir.dir.makePath("root/a1");
@@ -179,5 +188,5 @@ fn makeTestData(dir: testing.TmpDir) !void {
 }
 
 fn assertFs(root: *Filesystem.FsNode) !void {
-    try expect( root.children.items.len == 5);
+    try expect(root.children.items.len == 5);
 }
