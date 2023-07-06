@@ -36,6 +36,14 @@
             "group": {
                 "kind": "test",
             }
+        },{
+            "label": "run benchmark tests",
+            "type": "shell",
+            "command": "zig test ${workspaceFolder}/src/benchmark.zig",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+            }
         }
     ]
 }
