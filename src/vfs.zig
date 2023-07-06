@@ -17,6 +17,7 @@ pub const Filesystem = struct {
         children: ArrayList(*FsNode),
         parent: ?*FsNode,
         kind: fs.File.Kind,
+        total: u32 = 1,
 
         fn init(allocator: Allocator, path: []const u8, kind: fs.File.Kind) !FsNode {
             const _path = try std.fmt.allocPrint(allocator, "{s}", .{path});
@@ -43,6 +44,7 @@ pub const Filesystem = struct {
 
         fn addChild(self: *FsNode, node: *FsNode) !void {
             node.parent = self;
+            self.total += node.total;
             try self.children.append(node);
         }
 
@@ -61,6 +63,7 @@ pub const Filesystem = struct {
             } else {
                 try sb.append("{s}", .{fs.path.basename(self.path)});
             }
+            try sb.append("[{d}]", .{self.total});
             try sb.append("\n", .{});
 
             for (self.children.items) |child| {
@@ -110,8 +113,11 @@ pub const Filesystem = struct {
             var top = stack.pop();
             while (!std.mem.eql(u8, top.path, node_parent)) {
                 top = stack.pop();
+                // log.warn("{?s}", .{top.path});
             }
             try stack.append(top);
+            log.warn("{?s} {s}", .{ top.path, node.path });
+            // top.total = top.total + node.total;
             try stack.append(node);
             try top.addChild(node);
 
