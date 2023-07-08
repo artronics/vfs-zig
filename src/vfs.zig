@@ -44,7 +44,6 @@ pub const Filesystem = struct {
 
         fn addChild(self: *FsNode, node: *FsNode) !void {
             node.parent = self;
-            self.total += node.total;
             try self.children.append(node);
         }
 
@@ -63,7 +62,6 @@ pub const Filesystem = struct {
             } else {
                 try sb.append("{s}", .{fs.path.basename(self.path)});
             }
-            try sb.append("[{d}]", .{self.total});
             try sb.append("\n", .{});
 
             for (self.children.items) |child| {
@@ -113,11 +111,8 @@ pub const Filesystem = struct {
             var top = stack.pop();
             while (!std.mem.eql(u8, top.path, node_parent)) {
                 top = stack.pop();
-                // log.warn("{?s}", .{top.path});
             }
             try stack.append(top);
-            log.warn("{?s} {s}", .{ top.path, node.path });
-            // top.total = top.total + node.total;
             try stack.append(node);
             try top.addChild(node);
 
@@ -171,26 +166,26 @@ test "Fs" {
 /// create a simple nested directory structure for testing
 /// /root
 ///   /empty
-///   /a2
-///     /a2b0
-///       a2b0c0.txt
-///   a0.txt
-///   /a1
-///     a1b1.txt
-///     a1b0.txt
+///   /a
+///     /b
+///       c.txt
+///   b.txt
+///   /c
+///     c1.txt
+///     c2.txt
 ///   /same
 ///     /same
 ///       /same
 ///
 fn makeTestData(dir: testing.TmpDir) !void {
-    try dir.dir.makePath("root/a1");
-    try dir.dir.makePath("root/a2/a2b0");
     try dir.dir.makePath("root/empty");
+    try dir.dir.makePath("root/a/b");
+    try dir.dir.makePath("root/c");
     try dir.dir.makePath("root/same/same/same");
-    _ = try dir.dir.createFile("root/a0.txt", .{});
-    _ = try dir.dir.createFile("root/a1/a1b0.txt", .{});
-    _ = try dir.dir.createFile("root/a1/a1b1.txt", .{});
-    _ = try dir.dir.createFile("root/a2/a2b0/a2b0c0.txt", .{});
+    _ = try dir.dir.createFile("root/b.txt", .{});
+    _ = try dir.dir.createFile("root/c/c1.txt", .{});
+    _ = try dir.dir.createFile("root/c/c2.txt", .{});
+    _ = try dir.dir.createFile("root/a/b/c.txt", .{});
 }
 
 fn assertFs(root: *Filesystem.FsNode) !void {
