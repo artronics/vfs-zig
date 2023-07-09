@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const ArrayList = std.ArrayList;
 const StringBuilder = @import("string_builder.zig").StringBuilder;
 const fs = std.fs;
@@ -8,11 +9,10 @@ const log = std.log;
 pub const Filesystem = struct {
     const Self = @This();
 
-    allocator: Allocator,
+    arena: ArenaAllocator,
     root: *FsNode,
 
     const FsNode = struct {
-        allocator: Allocator,
         path: []const u8,
         children: ArrayList(*FsNode),
         parent: ?*FsNode,
@@ -20,26 +20,14 @@ pub const Filesystem = struct {
         total: u32 = 1,
 
         fn init(allocator: Allocator, path: []const u8, kind: fs.File.Kind) !FsNode {
-            const _path = try std.fmt.allocPrint(allocator, "{s}", .{path});
-
             const children = ArrayList(*FsNode).init(allocator);
 
             return FsNode{
-                .allocator = allocator,
-                .path = _path,
+                .path = path,
                 .children = children,
                 .parent = null,
                 .kind = kind,
             };
-        }
-
-        fn deinit(self: FsNode) void {
-            self.allocator.free(self.path);
-            for (self.children.items) |child| {
-                child.deinit();
-                self.allocator.destroy(child);
-            }
-            self.children.deinit();
         }
 
         fn addChild(self: *FsNode, node: *FsNode) !void {
@@ -71,40 +59,41 @@ pub const Filesystem = struct {
     };
 
     pub fn init(allocator: Allocator, path: []const u8) !Self {
+        var arena = ArenaAllocator.init(allocator);
+        const arenaAllocator = arena.allocator();
+
         var d = try fs.openDirAbsolute(path, .{ .access_sub_paths = true, .no_follow = true });
         defer d.close();
         const id = fs.IterableDir{ .dir = d };
-        var walker = try id.walk(allocator);
+        var walker = try id.walk(arenaAllocator);
         defer walker.deinit();
 
-        const root_path = fs.path.basename(path);
-        var root = try allocator.create(FsNode);
-        root.* = try FsNode.init(allocator, root_path, fs.File.Kind.Directory);
-        try walkDirs(allocator, &walker, root);
-        // while(try walker.next()) |n|{
-        //     log.warn("{?s}", .{fs.path.dirname(n.path)});
-        // }
+        const root_path = try std.fmt.allocPrint(arenaAllocator, "{s}", .{std.fs.path.basename(path)});
+        var root = try arenaAllocator.create(FsNode);
+        root.* = try FsNode.init(arenaAllocator, root_path, fs.File.Kind.Directory);
+        try walkDirs(&arena, &walker, root);
 
         return Self{
-            .allocator = allocator,
+            .arena = arena,
             .root = root,
         };
     }
 
     pub fn deinit(self: Self) void {
-        self.root.deinit();
-        self.allocator.destroy(self.root);
+        self.arena.deinit();
     }
 
-    fn walkDirs(allocator: Allocator, walker: *fs.IterableDir.Walker, root: *FsNode) !void {
-        var stack = ArrayList(*FsNode).init(allocator);
+    fn walkDirs(arena: *ArenaAllocator, walker: *fs.IterableDir.Walker, root: *FsNode) !void {
+        const arenaAllocator = arena.allocator();
+        var stack = ArrayList(*FsNode).init(arenaAllocator);
         defer stack.deinit();
 
         try stack.append(root);
 
         while (try walker.next()) |next| {
-            var node = try allocator.create(FsNode);
-            node.* = try FsNode.init(allocator, next.path, next.kind);
+            var node = try arenaAllocator.create(FsNode);
+            const path = try std.fmt.allocPrint(arenaAllocator, "{s}", .{next.path});
+            node.* = try FsNode.init(arenaAllocator, path, next.kind);
 
             const node_parent = fs.path.dirname(node.path) orelse root.path;
 
