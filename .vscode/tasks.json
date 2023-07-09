@@ -29,6 +29,14 @@
                 "kind": "test",
             }
         },{
+            "label": "run matcher tests",
+            "type": "shell",
+            "command": "zig test -femit-bin=${workspaceFolder}/zig-out/lib/matcher-test ${workspaceFolder}/src/matcher.zig",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+            }
+        },{
             "label": "run string_builder tests",
             "type": "shell",
             "command": "zig test ${workspaceFolder}/src/string_builder.zig",
