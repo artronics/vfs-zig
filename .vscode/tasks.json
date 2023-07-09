@@ -39,7 +39,7 @@
         },{
             "label": "run benchmark tests",
             "type": "shell",
-            "command": "zig test ${workspaceFolder}/src/benchmark.zig",
+            "command": "zig test -femit-bin=${workspaceFolder}/zig-out/lib/benchmark ${workspaceFolder}/src/benchmark.zig",
             "problemMatcher": [],
             "group": {
                 "kind": "test",

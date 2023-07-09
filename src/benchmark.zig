@@ -20,21 +20,29 @@ const Benchmark = struct {
     }
 };
 
-fn vfsInitBench(path: []const u8) !u64 {
+fn vfsInitBench(path: []const u8, results: []u64) !void {
     const a = testing.allocator;
     var timer = try time.Timer.start();
 
-    var vfs = try Filesystem.init(a, path);
-    defer vfs.deinit();
-
-    return timer.lap();
+    for (0..results.len) |i| {
+        var vfs = try Filesystem.init(a, path);
+        vfs.deinit();
+        results[i] = timer.lap();
+    }
 }
 
 test "benchmark" {
     var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     const zig = try std.fs.cwd().realpath("benchmark_data/zig", &buf);
-    const lap = try vfsInitBench(zig);
+    var results = [_]u64{0} ** 10;
+    try vfsInitBench(zig, &results);
 
-    const b = Benchmark{ .time = lap };
+    var sum: u64 = 0;
+    for (0..results.len) |i| {
+        log.warn("[{d}]: {d}", .{i, results[i] / 1000_000});
+        sum += results[i];
+    }
+
+    const b = Benchmark{ .time = (sum / results.len) / 1000_000 };
     try b.writeResults();
 }

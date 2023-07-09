@@ -12,6 +12,17 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"
+        },{
+            "name": "benchmark",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/lib/benchmark",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
         }
     ]
 }
