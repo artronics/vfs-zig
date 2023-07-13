@@ -30,5 +30,23 @@ def test_marker():
     marker("ababab", "ababab", [0, 1, 2, 3, 4, 5])
 
 
+def disperse_match(text, pattern):
+    i = len(text)
+    j = len(pattern)
+
+    while i > 0 or (i > 0 and j == 0):
+        if text[i - 1] == pattern[j - 1]:
+            j -= 1
+        i -= 1
+
+    print(f"{text} | {pattern} => {'match found' if j == 0 else 'not found'}")
+    return j
+
+
 if __name__ == '__main__':
-    test_marker()
+    disperse_match("abcd", "ad")
+    disperse_match("abab", "ad")
+    disperse_match("xyad", "ad")
+    disperse_match("", "")
+    disperse_match("ad", "adfoo")
+    # test_marker()
