@@ -45,6 +45,14 @@
                 "kind": "test",
             }
         },{
+            "label": "run string_store tests",
+            "type": "shell",
+            "command": "zig test -femit-bin=${workspaceFolder}/zig-out/lib/string_store-test ${workspaceFolder}/src/string_store.zig",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+            }
+        },{
             "label": "run benchmark tests",
             "type": "shell",
             "command": "zig test -femit-bin=${workspaceFolder}/zig-out/lib/benchmark ${workspaceFolder}/src/benchmark.zig",
