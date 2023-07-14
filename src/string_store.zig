@@ -22,21 +22,23 @@ fn StringStore(comptime T: type) type {
         }
 
         fn append(self: *Self, node: *const T, slice: []const u8) !void {
-            const node_ptr = std.mem.asBytes(node);
-            try self.buf.appendSlice(node_ptr);
+            var buf = [_]u8{0} ** @sizeOf(usize);
+            const _node = @ptrToInt(node);
+            std.mem.writeIntNative(usize, &buf, _node);
+
+            try self.buf.appendSlice(&buf);
             try self.buf.appendSlice(slice);
 
             self.len += 1;
         }
 
         fn next(self: *Self) Entry {
-            // const node = @ptrCast(*T, self.buf.items[0..@sizeOf(usize)]);
-            // _ = node;
-            // const text = self.buf.items[@sizeOf(u32)..];
-            const text = self.buf.items[@sizeOf(*T)..];
+            const node_ptr = std.mem.readIntNative(usize, self.buf.items[0..@sizeOf(usize)]);
+            const text = self.buf.items[@sizeOf(usize)..];
+
             return .{
                 .text = text,
-                // .node = node,
+                .node = @intToPtr(*T, node_ptr),
             };
         }
     };
@@ -62,7 +64,8 @@ test "multi_string_buffer" {
     try expect(ms.len == 1);
 
     const next = ms.next();
+
     try expect(std.mem.eql(u8, next.text, "foo"));
-    // const node_ptr = next.node;
-    // try expect(node_ptr == &v1);
+    const node_ptr = next.node;
+    try expect(node_ptr == v1);
 }
