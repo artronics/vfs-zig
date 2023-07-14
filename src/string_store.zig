@@ -22,22 +22,35 @@ fn StringStore(comptime T: type) type {
         }
 
         fn append(self: *Self, node: *const T, slice: []const u8) !void {
-            var buf = [_]u8{0} ** @sizeOf(usize);
-            const _node = @ptrToInt(node);
-            std.mem.writeIntNative(usize, &buf, _node);
+            { // serialize pointer to the node
+                var buf = [_]u8{0} ** @sizeOf(usize);
+                const _node = @ptrToInt(node);
+                std.mem.writeIntNative(usize, &buf, _node);
+                try self.buf.appendSlice(&buf);
+            }
+            { // serialize length of the slice
+                var buf = [_]u8{0} ** @sizeOf(usize);
+                std.mem.writeIntNative(usize, &buf, slice.len);
+                try self.buf.appendSlice(&buf);
+            }
 
-            try self.buf.appendSlice(&buf);
             try self.buf.appendSlice(slice);
 
             self.len += 1;
         }
 
         fn next(self: *Self) Entry {
-            const node_ptr = std.mem.readIntNative(usize, self.buf.items[0..@sizeOf(usize)]);
-            const text = self.buf.items[@sizeOf(usize)..];
+            const node_ptr_offset = 0;
+            const node_ptr = std.mem.readIntNative(usize, self.buf.items[node_ptr_offset..node_ptr_offset + @sizeOf(usize)]);
+
+            const slice_len_offset = node_ptr_offset + @sizeOf(usize);
+            const slice_len = std.mem.readIntNative(usize, self.buf.items[slice_len_offset..slice_len_offset + @sizeOf(usize)]);
+
+            const slice_offset = node_ptr_offset + slice_len_offset + @sizeOf(usize);
+            const slice = self.buf.items[slice_offset..slice_offset + slice_len];
 
             return .{
-                .text = text,
+                .text = slice,
                 .node = @intToPtr(*T, node_ptr),
             };
         }
