@@ -10,11 +10,6 @@ fn StringStore(comptime T: type) type {
         buf: ArrayList(u8),
         len: usize = 0,
 
-        const Entry = struct {
-            node: ?*T = null,
-            text: []const u8,
-        };
-
         fn initCapacity(allocator: Allocator, capacity: usize) !StringStore(T) {
             const buf = try ArrayList(u8).initCapacity(allocator, capacity);
 
@@ -24,7 +19,7 @@ fn StringStore(comptime T: type) type {
         fn append(self: *Self, node: *const T, slice: []const u8) !void {
             { // serialize pointer to the node
                 var buf = [_]u8{0} ** @sizeOf(usize);
-                const _node = @ptrToInt(node);
+                const _node = @intFromPtr(node);
                 std.mem.writeIntNative(usize, &buf, _node);
                 try self.buf.appendSlice(&buf);
             }
@@ -39,21 +34,44 @@ fn StringStore(comptime T: type) type {
             self.len += 1;
         }
 
-        fn next(self: *Self) Entry {
-            const node_ptr_offset = 0;
-            const node_ptr = std.mem.readIntNative(usize, self.buf.items[node_ptr_offset..node_ptr_offset + @sizeOf(usize)]);
-
-            const slice_len_offset = node_ptr_offset + @sizeOf(usize);
-            const slice_len = std.mem.readIntNative(usize, self.buf.items[slice_len_offset..slice_len_offset + @sizeOf(usize)]);
-
-            const slice_offset = node_ptr_offset + slice_len_offset + @sizeOf(usize);
-            const slice = self.buf.items[slice_offset..slice_offset + slice_len];
-
+        fn iterator(self: Self) Iterator {
             return .{
-                .text = slice,
-                .node = @intToPtr(*T, node_ptr),
+                .len = self.len,
+                .items = self.buf.items,
             };
         }
+
+        const Entry = struct {
+            node: ?*T = null,
+            text: []const u8,
+        };
+
+        const Iterator = struct {
+            index: usize = 0,
+            len: usize,
+
+            items: []const u8,
+
+            fn next(it: *Iterator) ?Entry {
+                if (it.index >= it.len) return null;
+
+                const node_ptr_offset = 0;
+                const node_ptr_int = std.mem.readIntNative(usize, it.items[node_ptr_offset .. node_ptr_offset + @sizeOf(usize)]);
+
+                const slice_len_offset = node_ptr_offset + @sizeOf(usize);
+                const slice_len = std.mem.readIntNative(usize, it.items[slice_len_offset .. slice_len_offset + @sizeOf(usize)]);
+
+                const slice_offset = node_ptr_offset + slice_len_offset + @sizeOf(usize);
+                const slice = it.items[slice_offset .. slice_offset + slice_len];
+
+                it.index += 1;
+
+                return .{
+                    .text = slice,
+                    .node = @as(*T, @ptrFromInt(node_ptr_int)),
+                };
+            }
+        };
     };
 }
 
@@ -76,9 +94,10 @@ test "multi_string_buffer" {
     try ms.append(v1, "foo");
     try expect(ms.len == 1);
 
-    const next = ms.next();
+    var it = ms.iterator();
 
-    try expect(std.mem.eql(u8, next.text, "foo"));
-    const node_ptr = next.node;
+    const foo = it.next().?;
+    try expect(std.mem.eql(u8, foo.text, "foo"));
+    const node_ptr = foo.node;
     try expect(node_ptr == v1);
 }

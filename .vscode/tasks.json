@@ -45,9 +45,9 @@
                 "kind": "test",
             }
         },{
-            "label": "run string_store tests",
+            "label": "run memory tests",
             "type": "shell",
-            "command": "zig test -femit-bin=${workspaceFolder}/zig-out/lib/string_store-test ${workspaceFolder}/src/string_store.zig",
+            "command": "zig test -femit-bin=${workspaceFolder}/zig-out/lib/memory-test ${workspaceFolder}/src/memory.zig",
             "problemMatcher": [],
             "group": {
                 "kind": "test",
