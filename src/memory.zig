@@ -71,6 +71,10 @@ fn StringStore(comptime T: type) type {
                     .node = @as(*T, @ptrFromInt(node_ptr_int)),
                 };
             }
+
+            fn reset(it: *Iterator) void {
+                it.index = 0;
+            }
         };
     };
 }
@@ -83,16 +87,20 @@ test "multi_string_buffer" {
     defer arena.deinit();
     const a = arena.allocator();
 
-    const MyStruct = struct { foo: u32 };
-    var v1 = try a.create(MyStruct);
-    v1.* = MyStruct{ .foo = 23 };
+    const MyStruct = struct { a: u32 };
 
     var ms = try StringStore(MyStruct).initCapacity(a, 10);
-
     try expect(ms.len == 0);
 
+    var v1 = try a.create(MyStruct);
+    v1.* = MyStruct{ .a = 23 };
     try ms.append(v1, "foo");
     try expect(ms.len == 1);
+
+    var v2 = try a.create(MyStruct);
+    v2.* = MyStruct{ .a = 42 };
+    try ms.append(v2, "bar");
+    try expect(ms.len == 2);
 
     var it = ms.iterator();
 
@@ -100,4 +108,7 @@ test "multi_string_buffer" {
     try expect(std.mem.eql(u8, foo.text, "foo"));
     const node_ptr = foo.node;
     try expect(node_ptr == v1);
+
+    const bar = it.next().?;
+    try expect(std.mem.eql(u8, bar.text, "bar"));
 }
