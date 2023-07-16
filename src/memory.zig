@@ -3,20 +3,20 @@ const ArrayList = std.ArrayList;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const Allocator = std.mem.Allocator;
 
-fn StringStore(comptime T: type) type {
+pub fn StringStore(comptime T: type) type {
     return struct {
         const Self = @This();
 
         buf: ArrayList(u8),
         len: usize = 0,
 
-        fn initCapacity(allocator: Allocator, capacity: usize) !StringStore(T) {
+        pub fn initCapacity(allocator: Allocator, capacity: usize) !StringStore(T) {
             const buf = try ArrayList(u8).initCapacity(allocator, capacity);
 
             return .{ .buf = buf };
         }
 
-        fn append(self: *Self, node: *const T, slice: []const u8) !void {
+        pub fn append(self: *Self, node: *const T, slice: []const u8) !void {
             { // serialize pointer to the node
                 var buf = [_]u8{0} ** @sizeOf(usize);
                 const _node = @intFromPtr(node);
@@ -34,7 +34,7 @@ fn StringStore(comptime T: type) type {
             self.len += 1;
         }
 
-        fn iterator(self: Self) Iterator {
+        pub fn iterator(self: Self) Iterator {
             return .{
                 .len = self.len,
                 .items = self.buf.items,
