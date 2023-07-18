@@ -114,8 +114,11 @@ def test_score_base():
     s = score("sabcdbc", "ad")
     assert_that(s).is_equal_to((2 * _Qc) + (4 * _Qd) + (2 * _QDi) + _Qk1)
 
+    s = score("saxyybyzxcy", "abc")
+    assert_that(s).is_equal_to((3 * _Qc) + (7 * _Qd) + (3 * _QDi) + _Qk1)
 
-def test_score_boundary():
+
+def test_score_word_boundary():
     print("\n")
     s = score("a", "a")
     assert_that(s).is_equal_to(_Qc)
@@ -125,7 +128,9 @@ def test_score_boundary():
     assert_that(s).is_equal_to(_Qc + _Qk1)
     s = score("Aa", "a")
     assert_that(s).is_equal_to(_Qc + _Qk1)
-    s = score("Aaxyz", "a")
+    s = score("Xaxyz", "a")
+    assert_that(s).is_equal_to(_Qc + _Qb + _Qk1)
+    s = score("xAxxyz", "a")
     assert_that(s).is_equal_to(_Qc + _Qb + _Qk1)
 
     s = score("ssaxyzBxyz", "ab")
@@ -134,6 +139,40 @@ def test_score_boundary():
     assert_that(s).is_equal_to((2 * _Qc) + _Qb + (7 * _Qd) + (2 * _QDi) + _Qk1)
     s = score("ssCxyzaxyzBxyzCxyz", "ab")
     assert_that(s).is_equal_to((2 * _Qc) + _Qb + (7 * _Qd) + (2 * _QDi) + _Qk1)
+
+    # TODO: this is a bug. Committing Qd results in acc being zero and then QDi is not getting added
+    s = score("sayYxbyZxcy", "abc")
+    assert_that(s).is_equal_to((3 * _Qc) + (7 * _Qd) + (3 * _QDi) + _Qk1)
+
+
+def test_relative_scoring():
+    print("\n")
+    pattern = "abc"
+    # var "a" is always base-line
+    a = score("abc", pattern)
+
+    b = score("abcd", pattern)
+    assert_that(a).is_greater_than(b)
+    b = score("_abc", pattern)
+    assert_that(a).is_greater_than(b)
+    b = score("Aabc", pattern)
+    assert_that(a).is_greater_than(b)
+
+    print("We don't about the distance when match is found. i.e. Qk (kill) is a fixed score")
+    a = score("aabc", pattern)
+    b = score("xyzaabc", pattern)
+    assert_that(a).is_equal_to(b)
+
+    print("A word boundary has fixed distance")
+    a = score("AxyzBzyzCxyz", pattern)
+    b = score("axyzbzyzcxyz", pattern)
+    assert_that(a).is_greater_than(b)
+
+    print("A word boundary has fixed distance only if the match character is at the beginning.")
+    print("This rule applies differently when case of a char changes. It's relative change.")
+    a = score("sayYxbyZxcy", pattern)
+    b = score("saxyybyzxcy", pattern)
+    assert_that(a).is_equal_to(b)
 
 
 if __name__ == '__main__':
