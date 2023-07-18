@@ -1,2 +1,4 @@
 jupyterlab
 notebook
+assertpy
+pytest

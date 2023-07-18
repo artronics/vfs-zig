@@ -34,7 +34,8 @@ def disperse_match(text, pattern):
     i = len(text)
     j = len(pattern)
 
-    while i > 0 or (i > 0 and j == 0):
+    # while i > 0 or (i > 0 and j == 0):
+    while i > 0 and j != 0:
         if text[i - 1] == pattern[j - 1]:
             j -= 1
         i -= 1
