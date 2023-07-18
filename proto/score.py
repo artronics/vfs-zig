@@ -1,41 +1,4 @@
-def score(text, pattern):
-    i = len(text)
-    j = len(pattern)
-    _score = 0
-
-    # cost of copy i.e. a match
-    _Qc = +1
-    # cost of delete i.e. mismatch
-    _Qd = -1
-
-    # The const of the distance itself. This indicate P0P1xy has higher score than P0xP1y even though,
-    # they have the same "total" distance.
-    _QDi = -1
-    # Cost off kill. We found all the matches. The rest is either 0 if it's the end of no matter how long it's -1
-    _Qk = lambda _i: 0 if _i == 0 else -1
-
-    # Set of word boundary
-    _Ab = lambda idx: text[idx] in {0, " ", "/", "."} or abs(ord(text[idx]) - ord(text[idx])) == 32
-
-    _di_acc = 0
-
-    while i > 0:
-        i -= 1
-        if text[i] == pattern[j - 1]:
-            j -= 1
-            _score += _Qc
-            _score += _di_acc
-            _score += 0 if _di_acc == 0 else _QDi
-            _di_acc = 0
-            if j == 0:
-                _score += _Qk(i)
-                break
-        else:
-            # _score += _Qd
-            _di_acc += _Qd
-
-    print(f"{'✓' if j == 0 else '✗'} [{_score}] ∈ {text} | {pattern}")
-    return _score if j == 0 else None
+from assertpy import assert_that
 
 
 def is_boundary(text, idx):
@@ -64,8 +27,117 @@ def test_is_boundary():
     assert is_boundary(" a", 1)
 
 
+def eq_ignore_case(a, b):
+    return a == b or abs(ord(a) - ord(b)) == 32
+
+
+def test_eq_ignore_case():
+    assert eq_ignore_case("a", "A")
+    assert eq_ignore_case("Z", "z")
+    assert eq_ignore_case("a", "a")
+    assert eq_ignore_case("z", "z")
+
+
+# cost of copy i.e. a match
+_Qc = +1
+# cost of delete i.e. a mismatch
+_Qd = -1
+
+# const of the distance itself. This indicate P0P1xy has higher score than P0xP1y even though,
+# they have the same "total" distance.
+_QDi = -1
+# Cost off kill. We found all the matches. It's either 0 or -1. 0 if there is nothing left, -1 otherwise
+_Qk = lambda idx: 0 if idx == 0 else -1
+
+# test for the set of word boundary
+_Ab = lambda text, idx: is_boundary(text, idx)
+
+# const of boundary. Axyz | a has the cost of Qb i.e. ignore xyz distance because A is the beginning of a word
+_Qb = -1
+
+
+def score(text, pattern, ignore_case=True):
+    i = len(text)
+    j = len(pattern)
+    _score = 0
+
+    _di_acc = 0
+
+    boundary = False
+    while i > 0:
+        i -= 1
+        if (text[i] == pattern[j - 1]) or (ignore_case and eq_ignore_case(text[i], pattern[j - 1])):
+            j -= 1
+            _score += _Qc
+
+            boundary = _Ab(text, i)
+            if boundary:
+                _score += 0 if _di_acc == 0 else _Qb
+            else:
+                _score += 0 if _di_acc == 0 else _QDi
+                _score += _di_acc
+            _di_acc = 0
+
+            if j == 0:
+                _score += _Qk(i)
+                break
+        else:
+            _di_acc += _Qd
+            if boundary:
+                # commit _di_acc and reset
+                _score += _di_acc
+                _di_acc = 0
+                # should we count it as QDi as well?
+                # _score += _QDi
+
+        boundary = _Ab(text, i)
+    print(f"{'✓' if j == 0 else '✗'} [{_score}] ∈ {text} | {pattern}")
+    return _score if j == 0 else None
+
+
+# const unrolled values to make assertion in tests more clear
+_Qk0 = _Qk(0)
+_Qk1 = _Qk(23)
+
+
+def test_score_base():
+    print("\n")
+    s = score("", "")
+    assert_that(s).is_equal_to(0)
+
+    # adding a character at the beginning (s) so, we know it's not being considered as word boundary
+    s = score("sad", "ad")
+    assert_that(s).is_equal_to(2 * _Qc + _Qk1)
+    s = score("sabcd", "ad")
+    assert_that(s).is_equal_to((2 * _Qc) + (2 * _Qd) + (1 * _QDi) + _Qk1)
+
+    s = score("sabcdbc", "ad")
+    assert_that(s).is_equal_to((2 * _Qc) + (4 * _Qd) + (2 * _QDi) + _Qk1)
+
+
+def test_score_boundary():
+    print("\n")
+    s = score("a", "a")
+    assert_that(s).is_equal_to(_Qc)
+    s = score("_axyz", "a")
+    assert_that(s).is_equal_to(_Qc + _Qb + _Qk1)
+    s = score("_A", "a")
+    assert_that(s).is_equal_to(_Qc + _Qk1)
+    s = score("Aa", "a")
+    assert_that(s).is_equal_to(_Qc + _Qk1)
+    s = score("Aaxyz", "a")
+    assert_that(s).is_equal_to(_Qc + _Qb + _Qk1)
+
+    s = score("ssaxyzBxyz", "ab")
+    assert_that(s).is_equal_to((2 * _Qc) + _Qb + (3 * _Qd) + _QDi + _Qk1)
+    s = score("ssaxyzBxyzCxyz", "ab")
+    assert_that(s).is_equal_to((2 * _Qc) + _Qb + (7 * _Qd) + (2 * _QDi) + _Qk1)
+    s = score("ssCxyzaxyzBxyzCxyz", "ab")
+    assert_that(s).is_equal_to((2 * _Qc) + _Qb + (7 * _Qd) + (2 * _QDi) + _Qk1)
+
+
 if __name__ == '__main__':
-    test_is_boundary()
+    print("\n")
     score("", "")
     score("ad", "ad")
     score("abcd", "ad")
@@ -82,4 +154,12 @@ if __name__ == '__main__':
     print("\na word boundary has the total distance of Qb. In 'AxyzyBcd' both 'xyzy' and 'cd' "
           "have the same distance=Qb no matter how long each one is.")
     score("xyAdxyxy", "ad")
+    score("xyAcdxyxy", "acd")
     score("xyAdxy", "ad")
+    score("xyAdxyBxy", "ad")
+    score("xyadxybxy", "ad")
+
+
+def test_boundary_score():
+    s = score("xyAdxyBxy", "ad")
+    print(s)
