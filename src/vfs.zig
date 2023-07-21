@@ -45,7 +45,7 @@ pub const Filesystem = struct {
             for (0..indent) |_| {
                 try sb.append("  ", .{});
             }
-            if (self.kind == fs.File.Kind.Directory) {
+            if (self.kind == fs.File.Kind.directory) {
                 try sb.append("/{s}", .{fs.path.basename(self.path)});
             } else {
                 try sb.append("{s}", .{fs.path.basename(self.path)});
@@ -70,7 +70,7 @@ pub const Filesystem = struct {
 
         const root_path = try std.fmt.allocPrint(arenaAllocator, "{s}", .{std.fs.path.basename(path)});
         var root = try arenaAllocator.create(FsNode);
-        root.* = try FsNode.init(arenaAllocator, root_path, fs.File.Kind.Directory);
+        root.* = try FsNode.init(arenaAllocator, root_path, fs.File.Kind.directory);
         try walkDirs(&arena, &walker, root);
 
         return Self{
