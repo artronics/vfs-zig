@@ -3,6 +3,7 @@ from _curses import KEY_BACKSPACE
 from random import randint
 
 from fuzzy_score_1 import score
+from fuzzy_score_2 import fuzzy_search_2
 
 
 def _read_one_wide_char_win(): return msvcrt.getwch()
@@ -131,6 +132,10 @@ def run_fuzzy_score_1():
     run_search(score)
 
 
+def run_fuzzy_score_2():
+    run_search(fuzzy_search_2)
+
+
 if __name__ == '__main__':
     def alg(text: str, pattern: str) -> int:
         # for r in [-2, None, -4, 6, 0]:
@@ -139,4 +144,4 @@ if __name__ == '__main__':
 
 
     # run_search(alg)
-    run_fuzzy_score_1()
+    run_fuzzy_score_2()
