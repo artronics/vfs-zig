@@ -91,7 +91,7 @@ def score(text, pattern, ignore_case=True):
                 # _score += _QDi
 
         boundary = _Ab(text, i)
-    print(f"{'✓' if j == 0 else '✗'} [{_score}] ∈ {text} | {pattern}")
+    # print(f"{'✓' if j == 0 else '✗'} [{_score}] ∈ {text} | {pattern}")
     return _score if j == 0 else None
 
 
