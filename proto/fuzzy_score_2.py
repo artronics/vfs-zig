@@ -15,7 +15,7 @@ def is_start_boundary(text, index) -> bool:
         return _current not in boundary_set  # boundary characters aren't considered as start
 
     _prev = text[index - 1]
-    return (_prev in boundary_set) or case_is_different(_prev, _current)
+    return (_prev in boundary_set) or (_current.isupper() and _prev.islower())
 
 
 def is_end_boundary(text, index):
@@ -24,10 +24,70 @@ def is_end_boundary(text, index):
         return _current not in boundary_set  # boundary characters aren't considered as end
 
     _next = text[index + 1]
-    return (_next in boundary_set) or case_is_different(_next, _current)
+    return (_next in boundary_set) or (_current.islower() and _next.isupper())
 
 
 def test_is_boundary():
+    def what(t, i):
+        s = is_start_boundary(t, i)
+        e = is_end_boundary(t, i)
+        print(f"{t} : {'START' if s else '  N/A'} | {' END' if e else ' N/A'}")
+        print(f"{' ' * i}^")
+
+    print()
+    what("fooBar", 3)
+    what("fooBar", 4)
+
+    what("FOObar", 3)
+    what("FOObar", 2)
+
+    what("fooBAR", 3)
+    what("fooBAR", 2)
+
+    s = is_start_boundary("a", 0)
+    e = is_end_boundary("a", 0)
+    assert_that(s and e).is_true()
+
+    s = is_start_boundary("BaR", 0)
+    e = is_end_boundary("a", 0)
+    assert_that(s and e).is_true()
+
+    s = is_start_boundary("_", 0)
+    e = is_end_boundary("_", 0)
+    assert_that(s or e).is_false()
+
+    s1 = is_start_boundary("FOObar", 0)
+    assert_that(s1).is_true()
+
+    e2 = is_end_boundary("FOObar", 5)
+    assert_that(e2).is_true()
+
+    # new boundary can't detect these :/
+    s2 = is_start_boundary("FOObar", 3)
+    assert_that(s2).is_false()
+    e1 = is_end_boundary("FOObar", 2)
+    assert_that(e1).is_false()
+
+
+def is_start_boundary2(text, index) -> bool:
+    _current = text[index]
+    if index == 0:
+        return _current not in boundary_set  # boundary characters aren't considered as start
+
+    _prev = text[index - 1]
+    return (_prev in boundary_set) or case_is_different(_prev, _current)
+
+
+def is_end_boundary2(text, index):
+    _current = text[index]
+    if index == len(text) - 1:
+        return _current not in boundary_set  # boundary characters aren't considered as end
+
+    _next = text[index + 1]
+    return (_next in boundary_set) or case_is_different(_next, _current)
+
+
+def test_is_boundary2():
     def what(t, i):
         s = is_start_boundary(t, i)
         e = is_end_boundary(t, i)
@@ -135,22 +195,46 @@ class Score:
     _qc = +1
     _copy = 0
 
+    _qd = -1
+    _delete = 0
+
+    _qs = lambda x: 2 ** (x + 1) - 1
+    _straight = None
+
     _qb = -1
     _boundary = 0
+
+    _qk = -1
+    _kill = 0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._straight = []
 
     def copy(self):
         self._copy += 1
 
+    def delete(self, x=1):
+        self._delete += x
+
+    def straight(self, x):
+        self._straight.append(x)
+
     def boundary(self):
         self._boundary += 1
 
+    def kill(self):
+        self._kill += 1
+
     def score(self):
-        return self._copy * self._qc + self._boundary * self._qb
+        return (self._copy * self._qc + self._delete * self._qd + self._boundary * self._qb +
+                sum(map(self._qs, self._straight))) + self._kill * self._qk
 
 
 def fuzzy_search_2(text: str, pattern: str):
     _score = Score()
     _di_acc = 0
+    _straight_acc = 0
 
     i = len(text) - 1
     j = len(pattern) - 1
@@ -159,48 +243,78 @@ def fuzzy_search_2(text: str, pattern: str):
 
     current_p = pattern[j]
     prev_p = pattern[j]
-    end_boundary_i = i + 1
-    boundary = []
+    boundary = None
 
     current_start_i = -1
     current_end_i = -1
     prev_start = current_start_i
     prev_end = current_end_i
 
+    # for debugging
+    boundaries = []
+
+    def commit_boundary():
+        _score.delete(_di_acc)
+
+    def commit_straight():
+        if _straight_acc > 0:
+            _score.straight(_straight_acc)
+
     while i >= 0:
         start_boundary = is_start_boundary(text, i)
         end_boundary = is_end_boundary(text, i)
-        no_boundary = Boundary.boundary(text, i) == Boundary.MIDDLE
         if start_boundary:
             current_start_i = i
+            boundary = None
         if end_boundary:
+            boundary = None
             current_end_i = i + 1
 
         if current_start_i != prev_start and current_end_i != prev_end:
-            boundary.append(text[current_start_i:current_end_i])
+            boundary = text[current_start_i:current_end_i]
             prev_end = current_end_i
             prev_start = current_start_i
 
-        if text[i] == current_p:
+            boundaries.append(boundary)
+
+        if text[i].lower() == current_p:
             _score.copy()
+            _straight_acc += 1
+            if boundary:
+                _di_acc = 0
+                if _straight_acc != len(boundary):
+                    _score.boundary()
+
             prev_p = pattern[j]
 
             if j == 0:
+                commit_straight()
+                commit_boundary()
                 break
             j -= 1
             current_p = pattern[j]
 
-        elif text[i] == prev_p:
+        elif text[i].lower() == prev_p:
             _score.copy()
 
         else:
             _di_acc += 1
+            commit_straight()
+
+            _straight_acc = 0
+
+        if boundary:
+            commit_boundary()
+            _di_acc = 0
 
         i -= 1
 
-    for b in boundary:
-        print(b)
+    # for b in boundaries:
+    #     print(b)
+    # print("------")
+
     # print(f"{'✓' if j == 0 else '✗'} [{_score}] ∈ {text} | {pattern}")
+
     return _score if j == 0 else None
 
 
@@ -208,23 +322,66 @@ def test_search_debug():
     print()
     # s = fuzzy_search_2("xXx", "?")
     s = fuzzy_search_2("fooBar", "?")
-    # s = fuzzy_search_2("xFOoBaR", "?")
+
+    s = fuzzy_search_2("FooBar", "?")
+    s = fuzzy_search_2("xFOoBaR", "?")
     # s = fuzzy_search_2("xxFOoBaR", "?")
 
 
 def test_search():
-    s = fuzzy_search_2("a", "a")
-    assert_that(s._copy).is_equal_to(1)
-    print("last p char will count as one since, loop will be terminated at that point")
-    s = fuzzy_search_2("aa", "a")
-    assert_that(s._copy).is_equal_to(1)
-    s = fuzzy_search_2("ab", "ab")
-    assert_that(s._copy).is_equal_to(2)
+    def base_match():
+        s = fuzzy_search_2("a", "a")
+        assert_that(s._copy).is_equal_to(1)
+        print("last p char will count as one since, loop will be terminated at that point")
+        s = fuzzy_search_2("aa", "a")
+        assert_that(s._copy).is_equal_to(1)
+        s = fuzzy_search_2("ab", "ab")
+        assert_that(s._copy).is_equal_to(2)
 
-    s = fuzzy_search_2("aabb", "ab")
-    assert_that(s._copy).is_equal_to(3)
-    s = fuzzy_search_2("aabab", "ab")
-    assert_that(s._copy).is_equal_to(2)
+        s = fuzzy_search_2("aabb", "ab")
+        assert_that(s._copy).is_equal_to(3)
+        s = fuzzy_search_2("aabab", "ab")
+        assert_that(s._copy).is_equal_to(2)
+
+    def straight():
+        s = fuzzy_search_2("ab", "ab")
+        assert_that(len(s._straight)).is_equal_to(1)
+        assert_that(s._straight[0]).is_equal_to(2)
+
+        s = fuzzy_search_2("abb", "ab")
+        assert_that(len(s._straight)).is_equal_to(1)
+        assert_that(s._straight[0]).is_equal_to(2)
+
+        s = fuzzy_search_2("abxab", "abab")
+        assert_that(len(s._straight)).is_equal_to(2)
+        assert_that(s._straight[0]).is_equal_to(2)
+        assert_that(s._straight[1]).is_equal_to(2)
+
+    def boundary():
+        s = fuzzy_search_2("BarFoo", "a")
+        assert_that(s._delete).is_equal_to(4)
+
+        s = fuzzy_search_2("FooBar", "fb")
+        assert_that(s._delete).is_equal_to(0)
+        assert_that(s._boundary).is_equal_to(2)
+
+        s = fuzzy_search_2("FooBar", "f")
+        assert_that(s._delete).is_equal_to(3)
+        assert_that(s._boundary).is_equal_to(1)
+
+        s = fuzzy_search_2("foo_bar", "fb")
+        # TODO: should boundary set be counted as di?
+        assert_that(s._delete).is_equal_to(1)
+        assert_that(s._boundary).is_equal_to(2)
+
+        s = fuzzy_search_2("foo_bar", "f_b")
+        # TODO: should boundary set be counted as boundary?
+        assert_that(s._delete).is_equal_to(0)
+        assert_that(s._boundary).is_equal_to(3)
+
+    base_match()
+    straight()
+    boundary()
 
 
 if __name__ == '__main__':
