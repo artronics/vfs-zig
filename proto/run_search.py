@@ -1,6 +1,8 @@
 import os
-from _curses import KEY_BACKSPACE
+import threading
 from random import randint
+
+from _curses import KEY_BACKSPACE
 
 from fuzzy_score_1 import score
 from fuzzy_score_2 import fuzzy_search_2
@@ -57,7 +59,7 @@ if os.name == "posix":
     read_one_wdchar, char_can_escape, dump_key_buffer = _read_one_wide_char_nix, _char_can_be_escape_nix, _dump_keyboard_buff_nix
 
 
-def getch_but_it_actually_works():
+def get_char():
     wchar = read_one_wdchar()
     if char_can_escape(wchar):
         dump = dump_key_buffer()
@@ -103,7 +105,7 @@ def run_search(alg):
     text_file = open("../benchmark_data/linux_files_list.txt", 'r')
     texts = text_file.readlines()
 
-    ch = getch_but_it_actually_works()
+    ch = get_char()
     while ch != '\x1b':
         results: list[(str, int)] = []
         buf_print.clear()
@@ -123,9 +125,43 @@ def run_search(alg):
 
         buf_print.print(pattern, results)
 
-        ch = getch_but_it_actually_works()
+        ch = get_char()
 
     text_file.close()
+
+
+class Pattern:
+    pattern = ""
+
+    def append(self, ch):
+        self.pattern += ch
+
+    def backspace(self):
+        self.pattern = self.pattern[0:len(self.pattern) - 1]
+
+
+def run_search_async():
+    _pattern = Pattern()
+
+    def consume_chars(pattern):
+        _ch = get_char()
+        while _ch != '\x1b':
+            results: list[(str, int)] = []
+            if _ch in [KEY_BACKSPACE, '\b', '\x7f']:
+                pattern.backspace()
+            else:
+                pattern.append(_ch)
+
+            print(pattern.pattern)
+
+            _ch = get_char()
+
+    def search():
+        print()
+
+    ch = threading.Thread(target=consume_chars, args=(_pattern,))
+    ch.start()
+    ch.join()
 
 
 def run_fuzzy_score_1():
@@ -136,6 +172,10 @@ def run_fuzzy_score_2():
     run_search(fuzzy_search_2)
 
 
+def run_fuzzy_search_async():
+    run_search_async()
+
+
 if __name__ == '__main__':
     def alg(text: str, pattern: str) -> int:
         # for r in [-2, None, -4, 6, 0]:
@@ -144,4 +184,5 @@ if __name__ == '__main__':
 
 
     # run_search(alg)
+    # run_fuzzy_search_async()
     run_fuzzy_score_2()

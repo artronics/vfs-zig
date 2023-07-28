@@ -230,6 +230,9 @@ class Score:
         return self._copy * self._qc + self._delete * self._qd + self._boundary * self._qb + \
             sum(map(self._qs, self._straight)) + self._kill * self._qk
 
+    def __str__(self) -> str:
+        return f"copy : {self._copy}\nstrat:{self._straight}\ndelet: {self._delete}\nbound: {self._boundary}\nkill : {self._kill}\nSCORE: {self.score()}"
+
 
 def fuzzy_search_2(text: str, pattern: str):
     _score = Score()
@@ -259,6 +262,12 @@ def fuzzy_search_2(text: str, pattern: str):
     def commit_straight():
         if _straight_acc > 0:
             _score.straight(_straight_acc)
+
+    def calculate_kill(_i):
+        path_separators = {"/"}
+        while text[_i] not in path_separators and _i >= 0:
+            _score.kill()
+            _i -= 1
 
     while i >= 0:
         start_boundary = is_start_boundary(text, i)
@@ -309,22 +318,36 @@ def fuzzy_search_2(text: str, pattern: str):
 
         i -= 1
 
+    calculate_kill(i - 1)
     # for b in boundaries:
     #     print(b)
     # print("------")
 
     # print(f"{'✓' if j == 0 else '✗'} [{_score}] ∈ {text} | {pattern}")
 
-    return _score.score() if j == 0 else None
+    # return _score.score() if j == 0 else None
+    return _score if j == 0 else None
 
 
 def test_search_debug():
     print()
-    # s = fuzzy_search_2("xXx", "?")
-    s = fuzzy_search_2("fooBar", "?")
+    # p = "./Documentation/devicetree/bindings/display/panel/sharp,ls037v7dw01.yaml"
+    p = "./Documentation/devicetree/bindings/display/panel/sharp,ls037v7dw01.yaml"
+    # q = "./arch/arm/boot/compressed/head-sharpsl.S"
+    q = "./Documentation/devicetree/bindings/display/panel/sharp,ld-d5116z01b.yaml"
 
-    s = fuzzy_search_2("FooBar", "?")
-    s = fuzzy_search_2("xFOoBaR", "?")
+    s = fuzzy_search_2(p, "sharpd")
+    print(p)
+    print(s)
+    print()
+    s = fuzzy_search_2(q, "sharpd")
+    print(q)
+    print(s)
+    # s = fuzzy_search_2("xXx", "?")
+    # s = fuzzy_search_2("fooBar", "?")
+
+    # s = fuzzy_search_2("FooBar", "?")
+    # s = fuzzy_search_2("xFOoBaR", "?")
     # s = fuzzy_search_2("xxFOoBaR", "?")
 
 
@@ -379,6 +402,18 @@ def test_search():
         assert_that(s._delete).is_equal_to(0)
         assert_that(s._boundary).is_equal_to(3)
 
+    def kill():
+        s = fuzzy_search_2("foo_bar", "fb")
+        assert_that(s._kill).is_equal_to(0)
+        s = fuzzy_search_2("/foo_bar", "fb")
+        assert_that(s._kill).is_equal_to(0)
+        s = fuzzy_search_2("yxfoo_bar", "fb")
+        assert_that(s._kill).is_equal_to(2)
+        s = fuzzy_search_2("yx/foo_bar", "fb")
+        assert_that(s._kill).is_equal_to(0)
+        s = fuzzy_search_2("yx/xyfoo_bar", "fb")
+        assert_that(s._kill).is_equal_to(2)
+
     def relative():
         s1 = fuzzy_search_2("FooBar", "fb").score()
         s2 = fuzzy_search_2("foo_bar", "fb").score()
@@ -387,6 +422,7 @@ def test_search():
     base_match()
     straight()
     boundary()
+    kill()
     relative()
 
 
