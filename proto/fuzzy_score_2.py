@@ -198,7 +198,7 @@ class Score:
     _qd = -1
     _delete = 0
 
-    _qs = lambda x: 2 ** (x + 1) - 1
+    _qs = lambda self, x: 2 ** (x + 1) - 1
     _straight = None
 
     _qb = -1
@@ -227,8 +227,8 @@ class Score:
         self._kill += 1
 
     def score(self):
-        return (self._copy * self._qc + self._delete * self._qd + self._boundary * self._qb +
-                sum(map(self._qs, self._straight))) + self._kill * self._qk
+        return self._copy * self._qc + self._delete * self._qd + self._boundary * self._qb + \
+            sum(map(self._qs, self._straight)) + self._kill * self._qk
 
 
 def fuzzy_search_2(text: str, pattern: str):
@@ -315,7 +315,7 @@ def fuzzy_search_2(text: str, pattern: str):
 
     # print(f"{'✓' if j == 0 else '✗'} [{_score}] ∈ {text} | {pattern}")
 
-    return _score if j == 0 else None
+    return _score.score() if j == 0 else None
 
 
 def test_search_debug():
@@ -379,9 +379,15 @@ def test_search():
         assert_that(s._delete).is_equal_to(0)
         assert_that(s._boundary).is_equal_to(3)
 
+    def relative():
+        s1 = fuzzy_search_2("FooBar", "fb").score()
+        s2 = fuzzy_search_2("foo_bar", "fb").score()
+        assert s1 > s2
+
     base_match()
     straight()
     boundary()
+    relative()
 
 
 if __name__ == '__main__':
